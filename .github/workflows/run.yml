@@ -1,0 +1,23 @@
+
+name: run.yml
+on:
+  workflow_dispatch:
+  # Run every Friday afternoon
+  schedule:
+  - cron: '30 16 * * 5'
+
+permissions: read-all
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Fetch latest data
+      run: Rscript /app/R/main.R
