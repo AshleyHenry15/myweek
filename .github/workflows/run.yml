@@ -17,9 +17,12 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-    - uses: actions/checkout@v4
 
-    - name: Fetch latest data
+    - name: Run script
       run: Rscript /app/R/main.R
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Interactive debug
+      if: ${{ always() && runner.debug == '1' && github.run_attempt != '1' }}
+      uses: r-hub/actions/ssh-server@main
