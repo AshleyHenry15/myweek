@@ -20,7 +20,7 @@ WORKDIR /app
 RUN : -- TESTS ------------------------------------------------------- && \
     if [ -d tests ]; then \
       R -q -e 'testthat::test_local()'; \
-      R -q -e 'covr::package_coverage())'; \
+      R -q -e 'covr::package_coverage()'; \
     fi && \
     : ---------------------------------------------------------------------
 
