@@ -55,3 +55,5 @@ RUN echo PermitRootLogin yes >> /etc/ssh/sshd_config && \
     passwd -d root
 
 RUN git config --global --add safe.directory '/workspaces/*'
+
+RUN mkdir -p /workspaces
