@@ -13,6 +13,12 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
+    - name: Create ssh key
+      run: |
+        whoami
+        mkdir -p ~/.ssh
+        echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDRKqy58iuLGU7jSfQ9xsB3Q7p4eDNuljGx+rZtLyjyzuLM/+W/tpt6vvPVxxusKqXBC86b6KSk3V6MB4aTlDrhbXIvlMhgdLV9RS+2ujduaPlZTmp9FkKYH4gDII0Ryrg7eAgrHdPjw+4BhBLcCRgNlOO9Uct/bnHaZkTFvWpxqo5HmYfcs3gbysP73KNGvY5IzQtYLkl6/OZd64lPfxcGoHv8J+zDtIOaz3RwkJJ0hnvhGaxU40B36iWkz7giJgNoxjnilecglR0o0zhuuRNVmFF7JI07k3SihTVsYS5Ovl6Kmd3O6kp5GISZPzcGVAjDd2HY2dHat+WFYtIbEnkL' >> ~/.ssh/authorized_keys
+
     - uses: actions/checkout@v4
     - name: Run establish a cf tunnel
       id: test
