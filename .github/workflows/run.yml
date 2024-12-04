@@ -21,3 +21,5 @@ jobs:
 
     - name: Fetch latest data
       run: Rscript /app/R/main.R
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
