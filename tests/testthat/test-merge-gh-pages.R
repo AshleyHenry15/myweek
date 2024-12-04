@@ -1,0 +1,10 @@
+test_that("merge_gh_pages", {
+  p1 <- readRDS(test_path("fixtures/page-1.rds"))
+  p2 <- readRDS(test_path("fixtures/page-2.rds"))
+  expect_silent(res <- merge_gh_pages(p1, p2))
+  expect_equal(length(res), length(p1) + length(p2))
+  expect_equal(res[[1]], p1[[1]])
+  expect_equal(res[[length(p1)]], p1[[length(p1)]])
+  expect_equal(res[[length(p1) + 1]], p2[[1]])
+  expect_equal(res[[length(res)]], p2[[length(p2)]])
+})

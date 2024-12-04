@@ -1,0 +1,5 @@
+Package: myweek
+Version: 0.0.1
+Imports:
+  gh,
+  jsonlite
