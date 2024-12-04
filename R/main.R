@@ -27,13 +27,21 @@ gh_pg <- function(..., cond) {
   res
 }
 
-evts <- function(from = Sys.Date() - 7, until = Sys.Date()) {
+get_events <- function(from = Sys.Date() - 1) {
   username <- Sys.getenv("GITHUB_ACTOR", "gaborcsardi")
-  gh_pg("/users/{username}/events", username = username)
+  cond <- function(rsp) {
+    last_at <- parsedate::parse_iso_8601(rsp[[length(rsp)]][["created_at"]])
+    last_at >= as.POSIXct(from)
+  }
+  gh_pg("/users/{username}/events", username = username, cond = cond)
 }
 
 clean_events <- function(evts) {
   evts
+}
+
+send_summary <- function(evts) {
+  print(evts)
 }
 
 main <- function(args) {

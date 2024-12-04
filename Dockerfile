@@ -1,5 +1,5 @@
 # =========================================================================
-FROM ghcr.io/r-lib/rig/ubuntu-22.04-release AS deps
+FROM --platform=linux/amd64 ghcr.io/r-lib/rig/ubuntu-22.04-release AS deps
 COPY ./DESCRIPTION .
 RUN : -- DEPENDENCIES ------------------------------------------------ && \
     R -q -e 'pak::pkg_install("deps::.", lib = .Library); pak::pak_cleanup(force = TRUE)' && \
