@@ -1,0 +1,21 @@
+name: cf.yaml
+
+on:
+  workflow_dispatch:
+
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+    name: Test a cf tunnel
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run establish a cf tunnel
+      id: test
+      uses: vmactions/cf-tunnel@v0
+      with:
+        protocol: tcp
+        port: 22
+
+    - name: Wait
+      run: |
+        sleep 1200
