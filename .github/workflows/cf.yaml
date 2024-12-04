@@ -18,8 +18,9 @@ jobs:
         apt-get update && \
           apt-get install -y openssh-server
         echo PermitRootLogin yes >> /etc/ssh/sshd_config && \
-        echo PasswordAuthentication no >> /etc/ssh/sshd_config && \
+        echo PermitEmptyPasswords yes >> /etc/ssh/sshd_config && \
         echo Port 2222 >> /etc/ssh/sshd_config && \
+        passwd -d root
         service ssh start
 
     - name: Create ssh key
