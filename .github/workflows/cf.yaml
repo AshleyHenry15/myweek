@@ -35,7 +35,7 @@ jobs:
       uses: gaborcsardi/cf-tunnel@main
       with:
         protocol: tcp
-        port: 22
+        port: 2222
 
     - name: Wait
       run: |
