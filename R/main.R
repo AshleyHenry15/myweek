@@ -161,7 +161,10 @@ send_summary <- function(md) {
   from <- Sys.getenv("MAILGUN_FROM", "myweek@mail.gaborcsardi.org")
   rcpt <- Sys.getenv("MAILGUN_EMAIL", "csardi.gabor@gmail.com")
   url <- Sys.getenv("MAILGUN_URL", "https://api.mailgun.net/v3/mail.gaborcsardi.org/messages")
-  key <- Sys.getenv("MAILGUN_API_KEY", keyring::key_get("MAILGUN_API_KEY"))
+  key <- Sys.getenv("MAILGUN_API_KEY", NA_character_)
+  if (is.na(key)) {
+    key <- keyring::key_get("MAILGUN_API_KEY")
+  }
   send_res <- blastula::send_by_mailgun(
     msg,
     subject = sbjt,
