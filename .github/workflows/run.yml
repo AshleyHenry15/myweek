@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   # Run every Sunday night
   schedule:
-  - cron: '55 23 * * 7'
+  - cron: '55 23 * * 6'
 
 permissions: read-all
 
