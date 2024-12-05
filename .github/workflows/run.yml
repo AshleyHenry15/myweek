@@ -1,9 +1,9 @@
 name: run.yml
 on:
   workflow_dispatch:
-  # Run every Friday afternoon
+  # Run every Sunday night
   schedule:
-  - cron: '30 16 * * 5'
+  - cron: '55 23 * * 7'
 
 permissions: read-all
 
