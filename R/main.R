@@ -57,39 +57,132 @@ get_events <- function(from = Sys.Date() - 1) {
     last_at <- parsedate::parse_iso_8601(rsp[[length(rsp)]][["created_at"]])
     last_at >= as.POSIXct(from)
   }
-  gh_pg("/users/{username}/events", username = username, cond = cond)
+  # 100 is the maximum that GH will send in a single page
+  gh_pg(
+    "/users/{username}/events",
+    username = username,
+    cond = cond,
+    .per_page = 100
+  )
 }
 
 #' Remove events that I am not interested in
 #'
+#' First, remove events older than the requested date.
+#'
 #' Some events are from automated tasks, these are removed. These are
 #' specific for me, and should be parameterized for a generic tool.
 #'
-#' Additionally, all events are trimmed down, by keeping only the important
-#' fields. Current event types are listed at
-#' https://docs.github.com/en/rest/using-the-rest-api/github-event-types.
-#'
 #' @param evts List of events from the GitHub API.
-#' @return Cleaned list of events.
+#' @return Cleaned list of events. It loses the attributes, e.g. class
+#'   in the cleaning process.
 
-clean_events <- function(evts) {
-  evts
+clean_events <- function(evts, from = NULL) {
+  if (!is.null(from)) {
+    crat <- parsedate::parse_iso_8601(sapply(evts, "[[", "created_at"))
+    evts <- evts[crat >= as.POSIXct(from)]
+  }
+
+  drop <- function(pred) {
+    evts <<- evts[!vapply(evts, pred, logical(1))]
+  }
+
+  # Automatic issue comments in the /cran org
+  drop(\(x) x$type == "IssueCommentEvent" && grepl("^cran/", x$repo$name))
+
+  # Push to the packages branch of pak, that's the nightly build
+  drop(\(x) x$type == "PushEvent" && x$payload$ref == "refs/heads/packages")
+
+  # Push to r-lib/r-lib.github.io, also nightly build
+  drop(\(x) x$type == "PushEvent" && x$repo$name == "r-lib/r-lib.github.io")
+
+  c(evts)
+}
+
+keep <- function(evts, pred) {
+  evts[vapply(evts, pred, logical(1))]
+}
+
+repos_created <- function(evts) {
+  rps <- keep(evts, \(x) x$type == "CreateEvent" && x$payload$ref_type == "repository")
+  vapply(rps, \(x) x$repo$name, "")
+}
+
+commits_pushed <- function(evts) {
+  pss <- keep(evts, \(x) x$type == "PushEvent")
+  cms <- data.frame(
+    repo = vapply(pss, \(x) x$repo$name, ""),
+    count = vapply(pss, \(x) length(x$payload$commits), 1L)
+  )
+  dplyr::summarize(cms, count = sum(count), .by = repo)
+}
+
+summarize_events <- function(evts) {
+  rps <- repos_created(evts)
+  pss <- commits_pushed(evts)
+
+  list(
+    repos_created = rps,
+    commits_pushed = pss
+  )
+}
+
+format_summary <- function(summary) {
+  c(
+    if (length(summary$repos_created) > 0) {
+      c("# Repos created", "",
+        paste0("* ", summary$repos_created),
+        "", ""
+      )
+    },
+    if (nrow(summary$commits_pushed) > 0) {
+      cms <- summary$commits_pushed
+      c("# Commits pushed to repos", "",
+        paste0("* `", cms$repo, "`: ", cms$count, " commits"),
+        "", ""
+      )
+    }
+  )
 }
 
 #' Format the summary and send it in an email
 #'
-#' For now it does not actually send them, only prints them to the screen.
-#'
-#' @param evts List of (possibly cleaned) GitHub events.
+#' @param md Markdown summary to send.
 
-send_summary <- function(evts) {
-  print(evts)
+send_summary <- function(md) {
+  sbjt <- glue::glue("Weekly GitHub summary ({Sys.Date()})")
+  writeLines(c(sbjt, "", md))
+
+  msg <- blastula::compose_email(
+    header = sbjt,
+    body = blastula::md(paste(md, collapse = "\n"))
+  )
+
+  from <- Sys.getenv("MAILGUN_FROM", "myweek@mail.gaborcsardi.org")
+  rcpt <- Sys.getenv("MAILGUN_EMAIL", "csardi.gabor@gmail.com")
+  url <- Sys.getenv("MAILGUN_URL", "https://api.mailgun.net/v3/mail.gaborcsardi.org/messages")
+  key <- Sys.getenv("MAILGUN_API_KEY", keyring::key_get("MAILGUN_API_KEY"))
+  send_res <- blastula::send_by_mailgun(
+    msg,
+    subject = sbjt,
+    from = from,
+    recipients = rcpt,
+    url = url,
+    api_key = key
+  )
+
+  invisible(send_res)
 }
 
 main <- function(args) {
-  evts <- get_events()
-  clev <- clean_events(evts)
-  send_summary(clev)
+  library(blastula)
+  library(httr)
+  from <- Sys.Date() - 7
+  evts <- get_events(from)
+  clev <- clean_events(evts, from = from)
+  summary <- summarize_events(clev)
+  md <- format_summary(summary)
+  send_summary(md)
 }
 
 if (is.null(sys.call())) {

@@ -1,8 +1,12 @@
 Package: myweek
 Version: 0.0.1
 Imports:
+  blastula,
+  dplyr,
   gh,
+  glue,
   jsonlite,
+  keyring,
   parsedate
 Suggests:
   covr,
