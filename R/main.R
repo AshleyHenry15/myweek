@@ -7,21 +7,7 @@
 #'   the attributes from `res2`.
 
 merge_gh_pages <- function(res, res2) {
-  if (!is.null(names(res2)) && identical(names(res), names(res2))) {
-    res3 <- mapply(function(x, y, n) {
-      z <- c(x, y)
-      atm <- is.atomic(z)
-      if (atm && n %in% c("total_count", "incomplete_results")) {
-        y
-      } else if (atm) {
-        unique(z)
-      } else {
-        z
-      }
-    }, res, res2, names(res), SIMPLIFY = FALSE)
-  } else {
-    res3 <- c(res, res2)
-  }
+  res3 <- c(res, res2)
   attributes(res3) <- attributes(res2)
   res3
 }
