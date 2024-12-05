@@ -176,7 +176,7 @@ send_summary <- function(md) {
 
 main <- function(args) {
   library(blastula)
-  library(httr)
+  library(httr) # to work around a blastula bug
   from <- Sys.Date() - 7
   evts <- get_events(from)
   clev <- clean_events(evts, from = from)
