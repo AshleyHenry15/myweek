@@ -21,6 +21,7 @@ jobs:
       run: Rscript /app/R/main.R
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
 
     - name: Interactive debug
       if: ${{ always() && runner.debug == '1' && github.run_attempt != '1' }}
