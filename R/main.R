@@ -91,7 +91,27 @@ keep <- function(evts, pred) {
 
 repos_created <- function(evts) {
   rps <- keep(evts, \(x) x$type == "CreateEvent" && x$payload$ref_type == "repository")
-  vapply(rps, \(x) x$repo$name, "")
+  add_class(vapply(rps, \(x) x$repo$name, ""), "repos_created")
+}
+
+tags_created <- function(evts) {
+  rps <- keep(evts, \(x) x$type == "CreateEvent" && x$payload$ref_type == "tag")
+  tc <- data.frame(
+    repo = vapply(rps, \(x) x$repo$name, ""),
+    tag = vapply(rps, \(x) x$payload$ref, "")
+  )
+  tc <- tc[order(tc$repo, tc$tag), ]
+  add_class(tc, "tags_created")
+}
+
+branches_created <- function(evts) {
+  rps <- keep(evts, \(x) x$type == "CreateEvent" && x$payload$ref_type == "branch")
+  bc <- data.frame(
+    repo = vapply(rps, \(x) x$repo$name, ""),
+    branch = vapply(rps, \(x) x$payload$ref, "")
+  )
+  bc <- bc[order(bc$repo, bc$branch), ]
+  add_class(bc, "branches_created")
 }
 
 commits_pushed <- function(evts) {
@@ -100,34 +120,70 @@ commits_pushed <- function(evts) {
     repo = vapply(pss, \(x) x$repo$name, ""),
     count = vapply(pss, \(x) length(x$payload$commits), 1L)
   )
-  dplyr::summarize(cms, count = sum(count), .by = repo)
+  add_class(
+    dplyr::summarize(cms, count = sum(count), .by = repo),
+    "commits_pushed"
+  )
 }
 
 summarize_events <- function(evts) {
-  rps <- repos_created(evts)
-  pss <- commits_pushed(evts)
-
   list(
-    repos_created = rps,
-    commits_pushed = pss
+    repos_created = repos_created(evts),
+    tags_created = tags_created(evts),
+    branches_created = branches_created(evts),
+    commits_pushed = commits_pushed(evts)
+  )
+}
+
+format.repos_created <- function(x, ...) {
+  if (length(x) == 0) return(character())
+  c("# Repos created", "",
+    paste0("* ", x),
+    "", ""
+  )
+}
+
+format.tags_created <- function(x, ...) {
+  if (length(x) == 0) return(character())
+  perrepo <- summarize(
+    x,
+    tags = paste(sort(tag), collapse = ", "),
+    .by = repo
+  )
+  c("# Tags created", "",
+    paste0("* ", perrepo$repo, ": ", perrepo$tags),
+    "", ""
+  )
+}
+
+format.branches_created <- function(x, ...) {
+  if (length(x) == 0) return(character())
+  perrepo <- summarize(
+    x,
+    branches = paste(sort(branch), collapse = ", "),
+    .by = repo
+  )
+  c("# Branches created", "",
+    paste0("* ", perrepo$repo, ": ", perrepo$branches),
+    "", ""
+  )
+}
+
+format.commits_pushed <- function(x, ...) {
+  if (length(x) == 0) return(character())
+  c("# Commits pushed to repos", "",
+    paste0("* `", x$repo, "`: ", x$count, " commits"),
+    "", ""
   )
 }
 
 format_summary <- function(summary) {
   c(
-    if (length(summary$repos_created) > 0) {
-      c("# Repos created", "",
-        paste0("* ", summary$repos_created),
-        "", ""
-      )
-    },
-    if (nrow(summary$commits_pushed) > 0) {
-      cms <- summary$commits_pushed
-      c("# Commits pushed to repos", "",
-        paste0("* `", cms$repo, "`: ", cms$count, " commits"),
-        "", ""
-      )
-    }
+    format(summary$repos_created),
+    format(summary$tags_created),
+    format(summary$branches_created),
+    format(summary$commits_pushed),
+    NULL
   )
 }
 
@@ -161,6 +217,10 @@ send_summary <- function(md) {
   )
 
   invisible(send_res)
+}
+
+add_class <- function(x, cls) {
+  structure(x, class = c(cls, class(x)))
 }
 
 main <- function(args) {
