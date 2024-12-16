@@ -1,5 +1,7 @@
 Package: myweek
 Version: 0.0.1
+Depends:
+  purrr
 Imports:
   blastula,
   cli,
@@ -8,7 +10,8 @@ Imports:
   glue,
   jsonlite,
   keyring,
-  parsedate
+  parsedate,
+  purrr
 Suggests:
   covr,
   testthat

@@ -69,12 +69,12 @@ get_username <- function() {
 
 clean_events <- function(evts, from = NULL) {
   if (!is.null(from)) {
-    crat <- parsedate::parse_iso_8601(sapply(evts, "[[", "created_at"))
+    crat <- parsedate::parse_iso_8601(map_chr(evts, "created_at"))
     evts <- evts[crat >= as.POSIXct(from)]
   }
 
   drop <- function(pred) {
-    evts <<- evts[!vapply(evts, pred, logical(1))]
+    evts <<- discard(evts, pred)
   }
 
   # Automatic issue comments in the /cran org
@@ -89,20 +89,22 @@ clean_events <- function(evts, from = NULL) {
   c(evts)
 }
 
-keep <- function(evts, pred) {
-  evts[vapply(evts, pred, logical(1))]
-}
-
 repos_created <- function(evts) {
-  rps <- keep(evts, \(x) x$type == "CreateEvent" && x$payload$ref_type == "repository")
-  add_class(sort(vapply(rps, \(x) x$repo$name, "")), "repos_created")
+  rps <- keep(
+    evts,
+    \(x) x$type == "CreateEvent" && x$payload$ref_type == "repository"
+  )
+  add_class(
+    sort(map_chr(rps, c("repo", "name"))),
+    "repos_created"
+  )
 }
 
 forks_created <- function(evts) {
   rps <- keep(evts, \(x) x$type == "ForkEvent")
   fc <- data.frame(
-    repo = vapply(rps, \(x) x$payload$forkee$full_name, ""),
-    upstream = vapply(rps, \(x) x$repo$name, "")
+    repo = map_chr(rps, c("payload", "forkee", "full_name")),
+    upstream = map_chr(rps, c("repo", "name"))
   )
   add_class(fc, "forks_created")
 }
@@ -110,8 +112,8 @@ forks_created <- function(evts) {
 tags_created <- function(evts) {
   rps <- keep(evts, \(x) x$type == "CreateEvent" && x$payload$ref_type == "tag")
   tc <- data.frame(
-    repo = vapply(rps, \(x) x$repo$name, ""),
-    tag = vapply(rps, \(x) x$payload$ref, "")
+    repo = map_chr(rps, c("repo", "name")),
+    tag = map_chr(rps, c("payload", "ref"))
   )
   tc <- tc[order(tc$repo, tc$tag), ]
   add_class(tc, "tags_created")
@@ -120,8 +122,8 @@ tags_created <- function(evts) {
 branches_created <- function(evts) {
   rps <- keep(evts, \(x) x$type == "CreateEvent" && x$payload$ref_type == "branch")
   bc <- data.frame(
-    repo = vapply(rps, \(x) x$repo$name, ""),
-    branch = vapply(rps, \(x) x$payload$ref, "")
+    repo = map_chr(rps, c("repo", "name")),
+    branch = map_chr(rps, c("payload", "ref"))
   )
   bc <- bc[order(bc$repo, bc$branch), ]
   add_class(bc, "branches_created")
@@ -131,9 +133,9 @@ issues_opened <- function(evts) {
   iss <- keep(evts, \(x) x$type == "IssuesEvent" &&
     x$payload$action %in% c("opened", "reopened"))
   io <- data.frame(
-    repo = vapply(iss, \(x) x$repo$name, ""),
-    number = vapply(iss, \(x) x$payload$issue$number, 1L),
-    title = vapply(iss, \(x) x$payload$issue$title, "")
+    repo = map_chr(iss, c("repo", "name")),
+    number = map_int(iss, c("payload", "issue", "number")),
+    title = map_chr(iss, c("payload", "issue", "title"))
   )
   add_class(io, "issues_opened")
 }
@@ -142,22 +144,22 @@ issues_closed <- function(evts) {
   iss <- keep(evts, \(x) x$type == "IssuesEvent" &&
     x$payload$action %in% c("closed"))
   io <- data.frame(
-    repo = vapply(iss, \(x) x$repo$name, ""),
-    number = vapply(iss, \(x) x$payload$issue$number, 1L),
-    title = vapply(iss, \(x) x$payload$issue$title, "")
+    repo = map_chr(iss, c("repo", "name")),
+    number = map_int(iss, c("payload", "issue", "number")),
+    title = map_chr(iss, c("payload", "issue", "title"))
   )
   add_class(io, "issues_closed")
 }
 
 commits_pushed <- function(evts) {
   pss <- keep(evts, \(x) x$type == "PushEvent")
-  cp <- do.call(rbind, lapply(pss, function(ev) {
+  cp <- list_rbind(map(pss, function(ev) {
     cmts <- rev(ev$payload$commits)
     data.frame(
       repo = ev$repo$name,
       ref = ev$payload$ref,
-      message = first_line(vapply(cmts, "[[", "", "message")),
-      sha = vapply(cmts, "[[", "", "sha")
+      message = first_line(map_chr(cmts, "message")),
+      sha = map_chr(cmts, "sha")
     )
   }))
   cp <- cp[order(cp$repo), ]
@@ -241,7 +243,7 @@ link_issues <- function(text, repo) {
 }
 
 l_commit <- function(text, repo, sha) {
-  text <- mapply(text, repo, FUN = link_issues)
+  text <- map2_chr(text, repo, link_issues)
   glue::glue("{text} [\u27a1](https://github.com/{repo}/commit/{sha})")
 }
 
@@ -257,7 +259,7 @@ format.commits_pushed <- function(x, from, ...) {
   if (NROW(x) == 0) return(character())
   rps <- unique(x$repo)
   c("# \U0001f3c3 Commits pushed to repos", "",
-    unlist(lapply(rps, format_commits_for_repo, x)),
+    unlist(map(rps, format_commits_for_repo, x)),
     "", ""
   )
 }
@@ -274,7 +276,7 @@ format.issues_opened <- function(x, ...) {
   if (NROW(x) == 0) return(character())
   rps <- unique(x$repo)
   c("# \u2795 Issues opened", "",
-    unlist(lapply(rps, format_issues_for_repo, x)),
+    unlist(map(rps, format_issues_for_repo, x)),
     "", ""
   )
 }
@@ -283,7 +285,7 @@ format.issues_closed <- function(x, ...) {
   if (NROW(x) == 0) return(character())
   rps <- unique(x$repo)
   c("# \u2705 Issues closed", "",
-    unlist(lapply(rps, format_issues_for_repo, x)),
+    unlist(map(rps, format_issues_for_repo, x)),
     "", ""
   )
 }
@@ -338,12 +340,13 @@ add_class <- function(x, cls) {
 }
 
 first_line <- function(x) {
-  vapply(strsplit(x, "\n", fixed = TRUE), "[[", "", 1)
+  map_chr(strsplit(x, "\n", fixed = TRUE), 1L)
 }
 
 main <- function(args) {
   library(blastula)
   library(httr) # to work around a blastula bug
+  library(purrr)
   from <- Sys.Date() - 7
   evts <- get_events(from)
   clev <- clean_events(evts, from = from)
