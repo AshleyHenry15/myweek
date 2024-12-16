@@ -38,7 +38,7 @@ gh_pg <- function(..., cond) {
 #'   https://docs.github.com/en/rest/using-the-rest-api/github-event-types).
 
 get_events <- function(from = Sys.Date() - 1) {
-  username <- Sys.getenv("GITHUB_ACTOR", "gaborcsardi")
+  username <- get_username()
   cond <- function(rsp) {
     last_at <- parsedate::parse_iso_8601(rsp[[length(rsp)]][["created_at"]])
     last_at >= as.POSIXct(from)
@@ -50,6 +50,10 @@ get_events <- function(from = Sys.Date() - 1) {
     cond = cond,
     .per_page = 100
   )
+}
+
+get_username <- function() {
+  Sys.getenv("GITHUB_ACTOR", "gaborcsardi")
 }
 
 #' Remove events that I am not interested in
@@ -91,7 +95,7 @@ keep <- function(evts, pred) {
 
 repos_created <- function(evts) {
   rps <- keep(evts, \(x) x$type == "CreateEvent" && x$payload$ref_type == "repository")
-  add_class(vapply(rps, \(x) x$repo$name, ""), "repos_created")
+  add_class(sort(vapply(rps, \(x) x$repo$name, "")), "repos_created")
 }
 
 tags_created <- function(evts) {
@@ -120,10 +124,9 @@ commits_pushed <- function(evts) {
     repo = vapply(pss, \(x) x$repo$name, ""),
     count = vapply(pss, \(x) length(x$payload$commits), 1L)
   )
-  add_class(
-    dplyr::summarize(cms, count = sum(count), .by = repo),
-    "commits_pushed"
-  )
+  cp <- dplyr::summarize(cms, count = sum(count), .by = repo)
+  cp <- cp[order(cp$repo), ]
+  add_class(cp, "commits_pushed")
 }
 
 summarize_events <- function(evts) {
@@ -135,54 +138,71 @@ summarize_events <- function(evts) {
   )
 }
 
+l_repo <- function(text, repo = text) {
+  glue::glue("[{text}](https://github.com/{repo})")
+}
+
+l_tag <- function(text, repo, tag = text) {
+  glue::glue("[`{text}`](https://github.com/{repo}/releases/tag/{tag})")
+}
+
+l_branch <- function(text, repo, branch = text) {
+  glue::glue("[`{text}`](https://github.com/{repo}/tree/{branch})")
+}
+
 format.repos_created <- function(x, ...) {
   if (length(x) == 0) return(character())
-  c("# Repos created", "",
-    paste0("* ", x),
+  c("# \u2728 Repos created", "",
+    glue::glue("* {l_repo(x)}"),
     "", ""
   )
 }
 
 format.tags_created <- function(x, ...) {
   if (length(x) == 0) return(character())
-  perrepo <- summarize(
+  perrepo <- dplyr::summarize(
     x,
-    tags = paste(sort(tag), collapse = ", "),
+    tags = paste(l_tag(sort(tag), repo), collapse = ", "),
     .by = repo
   )
-  c("# Tags created", "",
-    paste0("* ", perrepo$repo, ": ", perrepo$tags),
+  c("# \U0001f516 Tags created", "",
+    glue::glue("* {l_repo(perrepo$repo)}: {perrepo$tags}"),
     "", ""
   )
 }
 
 format.branches_created <- function(x, ...) {
   if (length(x) == 0) return(character())
-  perrepo <- summarize(
+  perrepo <- dplyr::summarize(
     x,
-    branches = paste(sort(branch), collapse = ", "),
+    branches = paste(l_branch(sort(branch), repo), collapse = ", "),
     .by = repo
   )
-  c("# Branches created", "",
-    paste0("* ", perrepo$repo, ": ", perrepo$branches),
+  c("# \U0001f500 Branches created", "",
+    glue::glue("* {l_repo(perrepo$repo)}: {perrepo$branches}"),
     "", ""
   )
 }
 
-format.commits_pushed <- function(x, ...) {
+l_commits <- function(text, repo, from, until = Sys.Date() + 1) {
+  author <- get_username()
+  glue::glue("[{text}](https://github.com/{repo}/commits?author={author}&since={from}&until={until})")
+}
+
+format.commits_pushed <- function(x, from, ...) {
   if (length(x) == 0) return(character())
-  c("# Commits pushed to repos", "",
-    paste0("* `", x$repo, "`: ", x$count, " commits"),
+  c("# \U0001f3c3 Commits pushed to repos", "",
+    glue::glue("* {l_repo(x$repo)}: {l_commits(paste0(x$count, \" commits\"), x$repo, from)}"),
     "", ""
   )
 }
 
-format_summary <- function(summary) {
+format_summary <- function(summary, from) {
   c(
     format(summary$repos_created),
     format(summary$tags_created),
     format(summary$branches_created),
-    format(summary$commits_pushed),
+    format(summary$commits_pushed, from),
     NULL
   )
 }
@@ -230,7 +250,7 @@ main <- function(args) {
   evts <- get_events(from)
   clev <- clean_events(evts, from = from)
   summary <- summarize_events(clev)
-  md <- format_summary(summary)
+  md <- format_summary(summary, from = from)
   send_summary(md)
 }
 
