@@ -1,10 +1,11 @@
 Package: myweek
 Version: 0.0.1
 Depends:
+  blastula,
   glue,
+  httr,
   purrr
 Imports:
-  blastula,
   cli,
   dplyr,
   gh,
@@ -12,7 +13,8 @@ Imports:
   jsonlite,
   keyring,
   parsedate,
-  purrr
+  purrr,
+  whereami
 Suggests:
   covr,
   testthat
