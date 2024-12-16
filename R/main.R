@@ -247,7 +247,7 @@ l_commit <- function(text, repo, sha) {
   glue("{text} [\u27a1](https://github.com/{repo}/commit/{sha})")
 }
 
-format_commits_for_repo <- function(repo, x) {
+format_commits_for_repo <- function(repo, x, from) {
   cmts <- x[x$repo == repo, ]
   lab <- cli::pluralize("{nrow(cmts)} commit{?s}")
   c(glue("## {l_repo(repo)} ({l_commits(lab, repo, from)})"), "",
@@ -259,7 +259,7 @@ format.commits_pushed <- function(x, from, ...) {
   if (NROW(x) == 0) return(character())
   rps <- unique(x$repo)
   c("# \U0001f3c3 Commits pushed to repos", "",
-    unlist(map(rps, format_commits_for_repo, x)),
+    unlist(map(rps, format_commits_for_repo, x, from)),
     "", ""
   )
 }
