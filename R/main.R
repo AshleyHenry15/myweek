@@ -179,21 +179,21 @@ summarize_events <- function(evts) {
 }
 
 l_repo <- function(text, repo = text) {
-  glue::glue("[{text}](https://github.com/{repo})")
+  glue("[{text}](https://github.com/{repo})")
 }
 
 l_tag <- function(text, repo, tag = text) {
-  glue::glue("[`{text}`](https://github.com/{repo}/releases/tag/{tag})")
+  glue("[`{text}`](https://github.com/{repo}/releases/tag/{tag})")
 }
 
 l_branch <- function(text, repo, branch = text) {
-  glue::glue("[`{text}`](https://github.com/{repo}/tree/{branch})")
+  glue("[`{text}`](https://github.com/{repo}/tree/{branch})")
 }
 
 format.repos_created <- function(x, ...) {
   if (NROW(x) == 0) return(character())
   c("# \u2728 Repos created", "",
-    glue::glue("* {l_repo(x)}"),
+    glue("* {l_repo(x)}"),
     "", ""
   )
 }
@@ -201,7 +201,7 @@ format.repos_created <- function(x, ...) {
 format.forks_created <- function(x, ...) {
   if (NROW(x) == 0) return(character())
   c("# \U0001f374 Forks created", "",
-    glue::glue("* {l_repo(x$repo)} \u2b05 {l_repo(x$upstream)}"),
+    glue("* {l_repo(x$repo)} \u2b05 {l_repo(x$upstream)}"),
     "", ""
   )
 }
@@ -214,7 +214,7 @@ format.tags_created <- function(x, ...) {
     .by = repo
   )
   c("# \U0001f516 Tags created", "",
-    glue::glue("* {l_repo(perrepo$repo)}: {perrepo$tags}"),
+    glue("* {l_repo(perrepo$repo)}: {perrepo$tags}"),
     "", ""
   )
 }
@@ -227,31 +227,31 @@ format.branches_created <- function(x, ...) {
     .by = repo
   )
   c("# \U0001f500 Branches created", "",
-    glue::glue("* {l_repo(byrepo$repo)}: {byrepo$branches}"),
+    glue("* {l_repo(byrepo$repo)}: {byrepo$branches}"),
     "", ""
   )
 }
 
 l_commits <- function(text, repo, from, until = Sys.Date() + 1) {
   author <- get_username()
-  glue::glue("[{text}](https://github.com/{repo}/commits?author={author}&since={from}&until={until})")
+  glue("[{text}](https://github.com/{repo}/commits?author={author}&since={from}&until={until})")
 }
 
 link_issues <- function(text, repo) {
-  sub <- glue::glue("[\\1](https://github.com/{repo}/issues/\\1)")
+  sub <- glue("[\\1](https://github.com/{repo}/issues/\\1)")
   gsub("(#[0-9]+)\\b", sub, text)
 }
 
 l_commit <- function(text, repo, sha) {
   text <- map2_chr(text, repo, link_issues)
-  glue::glue("{text} [\u27a1](https://github.com/{repo}/commit/{sha})")
+  glue("{text} [\u27a1](https://github.com/{repo}/commit/{sha})")
 }
 
 format_commits_for_repo <- function(repo, x) {
   cmts <- x[x$repo == repo, ]
   lab <- cli::pluralize("{nrow(cmts)} commit{?s}")
-  c(glue::glue("## {l_repo(repo)} ({l_commits(lab, repo, from)})"), "",
-    glue::glue("* {l_commit(cmts$message, cmts$repo, cmts$sha)}"), ""
+  c(glue("## {l_repo(repo)} ({l_commits(lab, repo, from)})"), "",
+    glue("* {l_commit(cmts$message, cmts$repo, cmts$sha)}"), ""
   )
 }
 
@@ -266,9 +266,9 @@ format.commits_pushed <- function(x, from, ...) {
 
 format_issues_for_repo <- function(repo, x) {
   x <- x[x$repo == repo, ]
-  text <- glue::glue("{x$title} #{x$number}")
-  c(glue::glue("## {l_repo(repo)}"), "",
-    glue::glue("* {link_issues(text, repo)}"), ""
+  text <- glue("{x$title} #{x$number}")
+  c(glue("## {l_repo(repo)}"), "",
+    glue("* {link_issues(text, repo)}"), ""
   )
 }
 
@@ -308,7 +308,7 @@ format_summary <- function(smry, from) {
 #' @param md Markdown summary to send.
 
 send_summary <- function(md) {
-  sbjt <- glue::glue("Weekly GitHub summary ({Sys.Date()})")
+  sbjt <- glue("Weekly GitHub summary ({Sys.Date()})")
   writeLines(c(sbjt, "", md))
 
   msg <- blastula::compose_email(
@@ -346,6 +346,7 @@ first_line <- function(x) {
 main <- function(args) {
   library(blastula)
   library(httr) # to work around a blastula bug
+  library(glue)
   library(purrr)
   from <- Sys.Date() - 7
   evts <- get_events(from)

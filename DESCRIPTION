@@ -1,6 +1,7 @@
 Package: myweek
 Version: 0.0.1
 Depends:
+  glue,
   purrr
 Imports:
   blastula,
