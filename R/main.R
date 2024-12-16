@@ -127,6 +127,28 @@ branches_created <- function(evts) {
   add_class(bc, "branches_created")
 }
 
+issues_opened <- function(evts) {
+  iss <- keep(evts, \(x) x$type == "IssuesEvent" &&
+    x$payload$action %in% c("opened", "reopened"))
+  io <- data.frame(
+    repo = vapply(iss, \(x) x$repo$name, ""),
+    number = vapply(iss, \(x) x$payload$issue$number, 1L),
+    title = vapply(iss, \(x) x$payload$issue$title, "")
+  )
+  add_class(io, "issues_opened")
+}
+
+issues_closed <- function(evts) {
+  iss <- keep(evts, \(x) x$type == "IssuesEvent" &&
+    x$payload$action %in% c("closed"))
+  io <- data.frame(
+    repo = vapply(iss, \(x) x$repo$name, ""),
+    number = vapply(iss, \(x) x$payload$issue$number, 1L),
+    title = vapply(iss, \(x) x$payload$issue$title, "")
+  )
+  add_class(io, "issues_closed")
+}
+
 commits_pushed <- function(evts) {
   pss <- keep(evts, \(x) x$type == "PushEvent")
   cp <- do.call(rbind, lapply(pss, function(ev) {
@@ -148,6 +170,8 @@ summarize_events <- function(evts) {
     forks_created = forks_created(evts),
     tags_created = tags_created(evts),
     branches_created = branches_created(evts),
+    issues_opened = issues_opened(evts),
+    issues_closed = issues_closed(evts),
     commits_pushed = commits_pushed(evts)
   )
 }
@@ -238,12 +262,40 @@ format.commits_pushed <- function(x, from, ...) {
   )
 }
 
+format_issues_for_repo <- function(repo, x) {
+  x <- x[x$repo == repo, ]
+  text <- glue::glue("{x$title} #{x$number}")
+  c(glue::glue("## {l_repo(repo)}"), "",
+    glue::glue("* {link_issues(text, repo)}"), ""
+  )
+}
+
+format.issues_opened <- function(x, ...) {
+  if (NROW(x) == 0) return(character())
+  rps <- unique(x$repo)
+  c("# \u2795 Issues opened", "",
+    unlist(lapply(rps, format_issues_for_repo, x)),
+    "", ""
+  )
+}
+
+format.issues_closed <- function(x, ...) {
+  if (NROW(x) == 0) return(character())
+  rps <- unique(x$repo)
+  c("# \u2705 Issues closed", "",
+    unlist(lapply(rps, format_issues_for_repo, x)),
+    "", ""
+  )
+}
+
 format_summary <- function(smry, from) {
   c(
     format(smry$repos_created),
     format(smry$forks_created),
     format(smry$tags_created),
     format(smry$branches_created),
+    format(smry$issues_opened),
+    format(smry$issues_closed),
     format(smry$commits_pushed, from),
     NULL
   )
