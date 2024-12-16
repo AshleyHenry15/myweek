@@ -98,6 +98,15 @@ repos_created <- function(evts) {
   add_class(sort(vapply(rps, \(x) x$repo$name, "")), "repos_created")
 }
 
+forks_created <- function(evts) {
+  rps <- keep(evts, \(x) x$type == "ForkEvent")
+  fc <- data.frame(
+    repo = vapply(rps, \(x) x$payload$forkee$full_name, ""),
+    upstream = vapply(rps, \(x) x$repo$name, "")
+  )
+  add_class(fc, "forks_created")
+}
+
 tags_created <- function(evts) {
   rps <- keep(evts, \(x) x$type == "CreateEvent" && x$payload$ref_type == "tag")
   tc <- data.frame(
@@ -120,11 +129,15 @@ branches_created <- function(evts) {
 
 commits_pushed <- function(evts) {
   pss <- keep(evts, \(x) x$type == "PushEvent")
-  cms <- data.frame(
-    repo = vapply(pss, \(x) x$repo$name, ""),
-    count = vapply(pss, \(x) length(x$payload$commits), 1L)
-  )
-  cp <- dplyr::summarize(cms, count = sum(count), .by = repo)
+  cp <- do.call(rbind, lapply(pss, function(ev) {
+    cmts <- rev(ev$payload$commits)
+    data.frame(
+      repo = ev$repo$name,
+      ref = ev$payload$ref,
+      message = first_line(vapply(cmts, "[[", "", "message")),
+      sha = vapply(cmts, "[[", "", "sha")
+    )
+  }))
   cp <- cp[order(cp$repo), ]
   add_class(cp, "commits_pushed")
 }
@@ -132,6 +145,7 @@ commits_pushed <- function(evts) {
 summarize_events <- function(evts) {
   list(
     repos_created = repos_created(evts),
+    forks_created = forks_created(evts),
     tags_created = tags_created(evts),
     branches_created = branches_created(evts),
     commits_pushed = commits_pushed(evts)
@@ -151,15 +165,23 @@ l_branch <- function(text, repo, branch = text) {
 }
 
 format.repos_created <- function(x, ...) {
-  if (length(x) == 0) return(character())
+  if (NROW(x) == 0) return(character())
   c("# \u2728 Repos created", "",
     glue::glue("* {l_repo(x)}"),
     "", ""
   )
 }
 
+format.forks_created <- function(x, ...) {
+  if (NROW(x) == 0) return(character())
+  c("# \U0001f374 Forks created", "",
+    glue::glue("* {l_repo(x$repo)} \u2b05 {l_repo(x$upstream)}"),
+    "", ""
+  )
+}
+
 format.tags_created <- function(x, ...) {
-  if (length(x) == 0) return(character())
+  if (NROW(x) == 0) return(character())
   perrepo <- dplyr::summarize(
     x,
     tags = paste(l_tag(sort(tag), repo), collapse = ", "),
@@ -172,14 +194,14 @@ format.tags_created <- function(x, ...) {
 }
 
 format.branches_created <- function(x, ...) {
-  if (length(x) == 0) return(character())
-  perrepo <- dplyr::summarize(
+  if (NROW(x) == 0) return(character())
+  byrepo <- dplyr::summarize(
     x,
     branches = paste(l_branch(sort(branch), repo), collapse = ", "),
     .by = repo
   )
   c("# \U0001f500 Branches created", "",
-    glue::glue("* {l_repo(perrepo$repo)}: {perrepo$branches}"),
+    glue::glue("* {l_repo(byrepo$repo)}: {byrepo$branches}"),
     "", ""
   )
 }
@@ -189,20 +211,40 @@ l_commits <- function(text, repo, from, until = Sys.Date() + 1) {
   glue::glue("[{text}](https://github.com/{repo}/commits?author={author}&since={from}&until={until})")
 }
 
+link_issues <- function(text, repo) {
+  sub <- glue::glue("[\\1](https://github.com/{repo}/issues/\\1)")
+  gsub("(#[0-9]+)\\b", sub, text)
+}
+
+l_commit <- function(text, repo, sha) {
+  text <- mapply(text, repo, FUN = link_issues)
+  glue::glue("{text} [\u27a1](https://github.com/{repo}/commit/{sha})")
+}
+
+format_commits_for_repo <- function(repo, x) {
+  cmts <- x[x$repo == repo, ]
+  lab <- cli::pluralize("{nrow(cmts)} commit{?s}")
+  c(glue::glue("## {l_repo(repo)} ({l_commits(lab, repo, from)})"), "",
+    glue::glue("* {l_commit(cmts$message, cmts$repo, cmts$sha)}"), ""
+  )
+}
+
 format.commits_pushed <- function(x, from, ...) {
-  if (length(x) == 0) return(character())
+  if (NROW(x) == 0) return(character())
+  rps <- unique(x$repo)
   c("# \U0001f3c3 Commits pushed to repos", "",
-    glue::glue("* {l_repo(x$repo)}: {l_commits(paste0(x$count, \" commits\"), x$repo, from)}"),
+    unlist(lapply(rps, format_commits_for_repo, x)),
     "", ""
   )
 }
 
-format_summary <- function(summary, from) {
+format_summary <- function(smry, from) {
   c(
-    format(summary$repos_created),
-    format(summary$tags_created),
-    format(summary$branches_created),
-    format(summary$commits_pushed, from),
+    format(smry$repos_created),
+    format(smry$forks_created),
+    format(smry$tags_created),
+    format(smry$branches_created),
+    format(smry$commits_pushed, from),
     NULL
   )
 }
@@ -243,14 +285,18 @@ add_class <- function(x, cls) {
   structure(x, class = c(cls, class(x)))
 }
 
+first_line <- function(x) {
+  vapply(strsplit(x, "\n", fixed = TRUE), "[[", "", 1)
+}
+
 main <- function(args) {
   library(blastula)
   library(httr) # to work around a blastula bug
   from <- Sys.Date() - 7
   evts <- get_events(from)
   clev <- clean_events(evts, from = from)
-  summary <- summarize_events(clev)
-  md <- format_summary(summary, from = from)
+  smry <- summarize_events(clev)
+  md <- format_summary(smry, from = from)
   send_summary(md)
 }
 

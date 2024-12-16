@@ -2,6 +2,7 @@ Package: myweek
 Version: 0.0.1
 Imports:
   blastula,
+  cli,
   dplyr,
   gh,
   glue,
