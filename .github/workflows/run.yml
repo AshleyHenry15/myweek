@@ -21,7 +21,19 @@ jobs:
       run: Rscript /app/R/main.R
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
+
+    - name: Send Email via Gmail SMTP
+      run: |
+        echo "Subject: GitHub Action Report" > email.txt
+        echo "From: ${{ secrets.GMAIL_USER }}" >> email.txt
+        echo "To: workemail@gmail.com" >> email.txt
+        echo "" >> email.txt
+        echo "The GitHub action has completed successfully." >> email.txt
+
+        sendmail -v -f "${{ secrets.GMAIL_USER }}" -t < email.txt
+      env:
+        GMAIL_USER: ${{ secrets.GMAIL_USER }}
+        GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
 
     - name: Interactive debug
       if: ${{ always() && runner.debug == '1' && github.run_attempt != '1' }}
