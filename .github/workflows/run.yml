@@ -11,7 +11,7 @@ jobs:
   run:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository }}:latest
+      image: ghcr.io/ashleyhenry15/myweek:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
